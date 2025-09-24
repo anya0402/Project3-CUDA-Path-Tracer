@@ -4,6 +4,7 @@
 
 #include <thrust/random.h>
 
+
 __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal,
     thrust::default_random_engine &rng)
@@ -44,6 +45,48 @@ __host__ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__ glm::vec3 reflectRay(glm::vec3 &wi, glm::vec3 &normal) {
+    // from PBR Chapter 9.3
+	return wi - 2.0f * glm::dot(wi, normal) * normal;
+}
+
+__host__ __device__ glm::vec3 refractRay(glm::vec3 &wi, glm::vec3 &normal, glm::vec3 &wt, float eta) {
+	// from PBR Chapter 9.3
+	float cosTheta_val = glm::dot(wi, normal);
+    if (cosTheta_val < 0) {
+        eta = 1.0f / eta;
+        cosTheta_val = -cosTheta_val;
+        normal = -normal;
+    }
+    float sin2Theta_val = std::max<float>(0, 1.0f - cosTheta_val * cosTheta_val);
+	float sin2Theta_t = sin2Theta_val / (eta * eta);
+    if (sin2Theta_t >= 1.0f) {
+        return glm::vec3(0.0f); // total internal reflection case
+    }
+	float cosTheta_t = sqrt(1.0f - sin2Theta_t);
+	wt = (-wi / eta) + (cosTheta_val / eta - cosTheta_t) * normal;
+	return wt;
+}
+
+__host__ __device__ float fresnelRay(float cosTheta_val, float eta) {
+    // from PBR Chapter 9.3
+	cosTheta_val = glm::clamp(cosTheta_val, -1.0f, 1.0f);
+    if (cosTheta_val < 0) {
+        eta = 1.0f / eta;
+        cosTheta_val = -cosTheta_val;
+    }
+    float sin2Theta_val = std::max<float>(0, 1.0f - cosTheta_val * cosTheta_val);
+    float sin2Theta_t = sin2Theta_val / (eta * eta);
+    if (sin2Theta_t >= 1.0f) {
+        return 1.f; // total internal reflection case
+    }
+    float cosTheta_t = sqrt(1.0f - sin2Theta_t);
+
+    float r_parl = ((eta * cosTheta_val) - cosTheta_t) / ((eta * cosTheta_val) + cosTheta_t);
+	float r_perp = (cosTheta_val - (eta * cosTheta_t)) / (cosTheta_val + (eta * cosTheta_t));
+    return (r_parl * r_parl + r_perp * r_perp) / 2.0f;
+}
+
 __host__ __device__ void scatterRay(
     PathSegment & pathSegment,
     glm::vec3 intersect,
@@ -54,4 +97,40 @@ __host__ __device__ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+	glm::vec3 wi = glm::normalize(pathSegment.ray.direction);
+    glm::vec3 new_dir(0.0f);
+    glm::vec3 new_color = m.color;
+
+    //if (m.hasReflective && !(m.hasRefractive)) {
+    if (m.hasReflective) {
+        // mirror
+		new_dir = reflectRay(wi, normal);
+		new_color = m.color;
+    }
+  //  else if (m.hasRefractive) {
+  //      // glass
+	//	//new_color = m.color;
+	//	//new_dir = glm::vec3(0.0f);
+ // //      // ***FINISH***
+
+  //  }
+    else {
+        // diffuse
+		new_dir = calculateRandomDirectionInHemisphere(normal, rng);
+        new_color = m.color;
+    }
+
+    pathSegment.color *= new_color;
+    pathSegment.ray.direction = glm::normalize(new_dir);
+    pathSegment.ray.origin = intersect + pathSegment.ray.direction * .0001f;
+    pathSegment.remainingBounces--;
+
+    // original diffuse
+	//glm::vec3 wi = calculateRandomDirectionInHemisphere(normal, rng);
+	//pathSegment.ray.origin = intersect;
+	//pathSegment.color *= m.color;
+	//pathSegment.ray.direction = wi;
+	//pathSegment.remainingBounces--;
+
 }
