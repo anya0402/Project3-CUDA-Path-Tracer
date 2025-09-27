@@ -89,12 +89,12 @@
             "ROTAT":[0.0,0.0,0.0],
             "SCALE":[0.01,10.0,10.0]
         },
-        {
-            "TYPE":"sphere",
-            "MATERIAL":"glass",
-            "TRANS":[-1.0,4.0,-1.0],
-            "ROTAT":[0.0,0.0,0.0],
-            "SCALE":[3.0,3.0,3.0]
-        }
+      {
+        "TYPE": "sphere",
+        "MATERIAL": "diffuse_green",
+        "TRANS": [ -1.0, 4.0, -1.0 ],
+        "ROTAT": [ 0.0, 0.0, 0.0 ],
+        "SCALE": [ 3.0, 3.0, 3.0 ]
+      }
     ]
 }

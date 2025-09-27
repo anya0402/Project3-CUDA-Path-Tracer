@@ -280,13 +280,6 @@ __global__ void shadeMaterial(
             // Otherwise, do some pseudo-lighting computation. This is actually more
             // like what you would expect from shading in a rasterizer like OpenGL.
             // TODO: replace this! you should be able to start with basically a one-liner
-    //        else if (pathSegments[idx].remainingBounces >= 0) {
-    //            pathSegments[idx].remainingBounces--;
-                //glm::vec3 intersect_pt = getPointOnRay(pathSegments[idx].ray, intersection.t);
-    //            scatterRay(pathSegments[idx], intersect_pt, intersection.surfaceNormal, material, rng);
-
-    //        }
-
             else {
                 pathSegments[idx].remainingBounces--;
                 glm::vec3 intersect_pt = getPointOnRay(pathSegments[idx].ray, intersection.t);
