@@ -1,4 +1,5 @@
 #include "intersections.h"
+#include <glm/gtx/intersect.hpp>
 
 __host__ __device__ float boxIntersectionTest(
     Geom box,
@@ -110,4 +111,52 @@ __host__ __device__ float sphereIntersectionTest(
     //}
 
     return glm::length(r.origin - intersectionPoint);
+}
+
+__host__ __device__ float meshIntersectionTest
+    (Geom mesh,
+	Triangle* triangles,
+    Ray r,
+    glm::vec3& intersectionPoint,
+    glm::vec3& normal,
+    bool& outside)
+{
+    glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+    float tmax = 1e38f;
+    float tmin = tmax;
+    glm::vec3 baryNorm;
+
+    Ray rt;
+    rt.origin = ro;
+    rt.direction = rd;
+
+    for (int i = mesh.meshStartIdx; i < mesh.meshEndIdx + 1; ++i) {
+		Triangle curr_tri = triangles[i];
+        std::vector curr_verts = curr_tri.vertices;
+        std::vector curr_norms = curr_tri.normals;
+        glm::vec3 baryPos;
+        bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction, curr_verts[0], curr_verts[1], curr_verts[2], baryPos);
+
+        if (intersected) {
+            float t = baryPos.z;
+            if (t > 0 && t < tmin) {
+                // get closest intersection
+                tmin = t;
+                glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_norms[0]) + (baryPos.x * curr_norms[1]) + (baryPos.y * curr_norms[2]);
+                baryNorm = glm::normalize(baryNorm_val);
+            }
+        }
+	}
+
+    if (tmax >= tmin && tmax > 0)
+    {
+        outside = true;
+        intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(rt, tmin), 1.0f));
+        normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(baryNorm, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
+    }
+
+    outside = false;
+    return -1;
 }

@@ -71,6 +71,7 @@ set(sources
     src/scene.cpp
     src/utilities.cpp
     src/bvh.cpp
+    src/tiny_obj_loader.cc
 )
 
 set(imgui_headers
