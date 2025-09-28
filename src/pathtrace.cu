@@ -88,6 +88,8 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 static Triangle* dev_triangles = NULL;
+static Texture* dev_textures = NULL;
+static Texture* dev_textures_norms = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -119,6 +121,12 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
     cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
+    cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+    cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+
+    cudaMalloc(&dev_textures_norms, scene->textures_norms.size() * sizeof(Texture));
+    cudaMemcpy(dev_textures_norms, scene->textures_norms.data(), scene->textures_norms.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+
 
     checkCUDAError("pathtraceInit");
 }
@@ -132,6 +140,8 @@ void pathtraceFree()
     cudaFree(dev_intersections);
     // TODO: clean up any extra device memory you created
 	cudaFree(dev_triangles);
+	cudaFree(dev_textures);
+	cudaFree(dev_textures_norms);
 
     checkCUDAError("pathtraceFree");
 }
@@ -192,12 +202,14 @@ __global__ void computeIntersections(
         float t;
         glm::vec3 intersect_point;
         glm::vec3 normal;
+        glm::vec2 uv(-1.f);
         float t_min = FLT_MAX;
         int hit_geom_index = -1;
         bool outside = true;
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
+		glm::vec2 tmp_uv;
 
         // naive parse through global geoms
 
@@ -216,7 +228,7 @@ __global__ void computeIntersections(
             // TODO: add more intersection tests here... triangle? metaball? CSG?
             else if (geom.type == MESH)
             {
-                t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+                t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 
             // Compute the minimum t from the intersection tests to determine what
@@ -227,6 +239,7 @@ __global__ void computeIntersections(
                 hit_geom_index = i;
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
+				uv = tmp_uv;
             }
         }
 
@@ -240,6 +253,8 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = geoms[hit_geom_index].materialid;
             intersections[path_index].surfaceNormal = normal;
+
+            // **TODO Texturing**
         }
     }
 }

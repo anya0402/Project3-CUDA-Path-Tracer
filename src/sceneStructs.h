@@ -40,11 +40,16 @@ struct Geom
 
 struct Triangle
 {
-    //std::vector<glm::vec3> vertices;
-    //std::vector<glm::vec3> normals;
-    std::vector<glm::vec3> vertices{ std::vector<glm::vec3>(3) };
-    std::vector<glm::vec3> normals{ std::vector<glm::vec3>(3) };
+	glm::vec3 vertices[3];
+	glm::vec3 normals[3];
     int materialid;
+};
+
+struct Texture
+{
+    int width;
+    int height;
+    glm::vec3 color;
 };
 
 struct Material

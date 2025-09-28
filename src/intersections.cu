@@ -119,6 +119,7 @@ __host__ __device__ float meshIntersectionTest
     Ray r,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
+	glm::vec2& uv,
     bool& outside)
 {
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
@@ -133,17 +134,15 @@ __host__ __device__ float meshIntersectionTest
 
     for (int i = mesh.meshStartIdx; i < mesh.meshEndIdx + 1; ++i) {
 		Triangle curr_tri = triangles[i];
-        std::vector curr_verts = curr_tri.vertices;
-        std::vector curr_norms = curr_tri.normals;
         glm::vec3 baryPos;
-        bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction, curr_verts[0], curr_verts[1], curr_verts[2], baryPos);
+        bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction, curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);
 
         if (intersected) {
             float t = baryPos.z;
             if (t > 0 && t < tmin) {
                 // get closest intersection
                 tmin = t;
-                glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_norms[0]) + (baryPos.x * curr_norms[1]) + (baryPos.y * curr_norms[2]);
+                glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_tri.normals[0]) + (baryPos.x * curr_tri.normals[1]) + (baryPos.y * curr_tri.normals[2]);
                 baryNorm = glm::normalize(baryNorm_val);
             }
         }
