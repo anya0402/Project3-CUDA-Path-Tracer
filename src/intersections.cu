@@ -1,5 +1,6 @@
 #include "intersections.h"
 #include <glm/gtx/intersect.hpp>
+#include "bvh.h"
 
 __host__ __device__ float boxIntersectionTest(
     Geom box,
@@ -135,14 +136,16 @@ __host__ __device__ float meshIntersectionTest
     for (int i = mesh.meshStartIdx; i < mesh.meshEndIdx + 1; ++i) {
 		Triangle curr_tri = triangles[i];
         glm::vec3 baryPos;
-        bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction, curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);
+        bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction, 
+            curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);
 
         if (intersected) {
             float t = baryPos.z;
             if (t > 0 && t < tmin) {
                 // get closest intersection
                 tmin = t;
-                glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_tri.normals[0]) + (baryPos.x * curr_tri.normals[1]) + (baryPos.y * curr_tri.normals[2]);
+                glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_tri.normals[0]) 
+                    + (baryPos.x * curr_tri.normals[1]) + (baryPos.y * curr_tri.normals[2]);
                 baryNorm = glm::normalize(baryNorm_val);
             }
         }
@@ -158,4 +161,99 @@ __host__ __device__ float meshIntersectionTest
 
     outside = false;
     return -1;
+}
+
+__host__ __device__ float BVHIntersectionTest
+    (Geom mesh,
+    Triangle* triangles,
+    Ray r,
+    glm::vec3& intersectionPoint,
+    glm::vec3& normal,
+    glm::vec2& uv,
+    bool& outside,
+    BVHNode* bvhNodes)
+{
+    glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+    float tmax = 1e38f;
+    float tmin = tmax;
+    glm::vec3 baryNorm;
+
+    Ray rt;
+    rt.origin = ro;
+    rt.direction = rd;
+
+	int BVHnode_stack[64];
+	int stack_ptr = 0;
+	BVHnode_stack[stack_ptr++] = mesh.bvhRootIdx;
+
+    while (stack_ptr > 0) {
+		BVHNode curr_node = bvhNodes[BVHnode_stack[--stack_ptr]];
+		float intersect_box = IntersectAABB(rt, curr_node.aabbMin, curr_node.aabbMax);
+        if (intersect_box < 0) {
+            continue;
+		}
+
+        if (curr_node.triangleCount > 0) {
+            for (int i = curr_node.firstTriangleIdx; i < curr_node.firstTriangleIdx + curr_node.triangleCount; ++i) {
+                Triangle curr_tri = triangles[i];
+                glm::vec3 baryPos;
+                bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction,
+                    curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);
+                if (intersected) {
+                    float t = baryPos.z;
+                    if (t > 0 && t < tmin) {
+                        // get closest intersection
+                        tmin = t;
+                        glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_tri.normals[0])
+                            + (baryPos.x * curr_tri.normals[1]) + (baryPos.y * curr_tri.normals[2]);
+                        baryNorm = glm::normalize(baryNorm_val);
+                    }
+                }
+            }
+        }
+        else {
+			BVHnode_stack[stack_ptr++] = curr_node.leftChild;
+			BVHnode_stack[stack_ptr++] = curr_node.rightChild;
+        }
+    }
+
+    if (tmax >= tmin && tmax > 0) {
+        outside = true;
+        intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(rt, tmin), 1.0f));
+        normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(baryNorm, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
+    }
+
+    outside = false;
+    return -1;
+}
+
+__host__ __device__ float IntersectAABB(const Ray ray, const glm::vec3 bmin, const glm::vec3 bmax)
+{
+    // slab method
+    glm::vec3 ro = ray.origin;
+    glm::vec3 rd = ray.direction;
+	float tmin = -1e38f;
+	float tmax = 1e38f;
+
+    for (int i = 0; i < 3; i++) {
+		float inverse_dir = 1.0f / rd[i];
+		float t0 = (bmin[i] - ro[i]) * inverse_dir;
+		float t1 = (bmax[i] - ro[i]) * inverse_dir;
+        if (inverse_dir < 0.0f) {
+            float temp = t0;
+            t0 = t1;
+            t1 = temp;
+		}
+        tmin = glm::max(tmin, t0);
+        tmax = glm::min(tmax, t1);
+        if (tmax < tmin) {
+            return -1;
+        }
+	}
+    if (tmax < 0.0f) return -1.0f;
+    return tmin;
+    //return fmaxf(tmax, fabsf(tmin));
+
 }

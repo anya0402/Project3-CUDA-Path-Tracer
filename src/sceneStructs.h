@@ -36,6 +36,7 @@ struct Geom
     int numTriangles;
 	int meshStartIdx;
     int meshEndIdx;
+	int bvhRootIdx;
 };
 
 struct Triangle
@@ -43,6 +44,7 @@ struct Triangle
 	glm::vec3 vertices[3];
 	glm::vec3 normals[3];
     int materialid;
+    glm::vec3 centroid;
 };
 
 struct Texture
@@ -50,6 +52,16 @@ struct Texture
     int width;
     int height;
     glm::vec3 color;
+};
+
+struct BVHNode {
+    glm::vec3 aabbMin;
+    glm::vec3 aabbMax;
+    int leftChild;
+    int rightChild;
+    int firstTriangleIdx;
+    int triangleCount;
+    bool isLeaf() { return triangleCount > 0; }
 };
 
 struct Material

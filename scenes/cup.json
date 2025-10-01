@@ -94,18 +94,12 @@
             "SCALE":[0.01,10.0,10.0]
         },
       {
-        "TYPE": "cube",
-        "MATERIAL": "glass",
-        "TRANS": [ -1.0, 4.0, -1.0 ],
+        "TYPE": "mesh",
+        "MATERIAL": "diffuse_white",
+        "TRANS": [ -1.0, 1.0, -1.0 ],
         "ROTAT": [ 0.0, 0.0, 0.0 ],
-        "SCALE": [ 3.0, 3.0, 3.0 ]
-      },
-      {
-        "TYPE": "sphere",
-        "MATERIAL": "diffuse_red",
-        "TRANS": [ 1.0, 4.0, -3.0 ],
-        "ROTAT": [ 0.0, 0.0, 0.0 ],
-        "SCALE": [ 3.0, 3.0, 3.0 ]
+        "SCALE": [ 0.25, 0.25, 0.25 ],
+        "OBJFILE": "cup_green_obj"
       }
     ]
 }

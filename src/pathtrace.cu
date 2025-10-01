@@ -16,6 +16,7 @@
 #include "utilities.h"
 #include "intersections.h"
 #include "interactions.h"
+#include "bvh.h"
 
 #define ERRORCHECK 1
 
@@ -24,6 +25,7 @@
 
 #define SORT_MATERIALS 1
 #define STREAM_COMPACTION 1
+#define BVH 0
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line)
 {
@@ -88,6 +90,7 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 static Triangle* dev_triangles = NULL;
+static BVHNode* dev_bvhNodes = NULL;
 static Texture* dev_textures = NULL;
 static Texture* dev_textures_norms = NULL;
 
@@ -121,6 +124,9 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
     cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
+    cudaMalloc(&dev_bvhNodes, scene->bvhNodes.size() * sizeof(BVHNode));
+    cudaMemcpy(dev_bvhNodes, scene->bvhNodes.data(), scene->bvhNodes.size() * sizeof(BVHNode), cudaMemcpyHostToDevice);
+
     cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
     cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
 
@@ -140,6 +146,7 @@ void pathtraceFree()
     cudaFree(dev_intersections);
     // TODO: clean up any extra device memory you created
 	cudaFree(dev_triangles);
+    cudaFree(dev_bvhNodes);
 	cudaFree(dev_textures);
 	cudaFree(dev_textures_norms);
 
@@ -191,7 +198,8 @@ __global__ void computeIntersections(
     Geom* geoms,
     int geoms_size,
     Triangle* triangles,
-    ShadeableIntersection* intersections)
+    ShadeableIntersection* intersections,
+    BVHNode* bvh_nodes)
 {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -228,7 +236,11 @@ __global__ void computeIntersections(
             // TODO: add more intersection tests here... triangle? metaball? CSG?
             else if (geom.type == MESH)
             {
+#if BVH
+                t = BVHIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, bvh_nodes);
+#else
                 t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+#endif
 			}
 
             // Compute the minimum t from the intersection tests to determine what
@@ -422,8 +434,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_geoms,
             hst_scene->geoms.size(),
-			dev_triangles,
-            dev_intersections
+            dev_triangles,
+            dev_intersections,
+            dev_bvhNodes
             );
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();

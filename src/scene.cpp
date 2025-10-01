@@ -2,6 +2,7 @@
 
 #include "utilities.h"
 #include "tiny_obj_loader.h"
+#include "bvh.h"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
@@ -77,6 +78,7 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
 				new_tri.vertices[v] = glm::vec3(vx, vy, vz);
+                new_tri.centroid = (glm::vec3(vx) + glm::vec3(vy) + glm::vec3(vz)) * 0.3333f;
 
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
@@ -111,6 +113,17 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 	mesh.meshStartIdx = triangles.size() - num_triangles;
 	mesh.meshEndIdx = triangles.size() - 1;
 
+    //bvh creation
+    BVH bvh_instance(triangles);
+    bvh_instance.bvhNodes = new BVHNode[triangles.size() * 2];
+    bvh_instance.constructBVH();
+
+	int root_offset = bvhNodes.size();
+    mesh.bvhRootIdx = root_offset;
+    for (int i = 0; i < bvh_instance.nodes_used; ++i) {
+		bvhNodes.push_back(bvh_instance.bvhNodes[i]);
+    }
+    delete[] bvh_instance.bvhNodes;
 }
 
 void Scene::loadFromJSON(const std::string& jsonName)
