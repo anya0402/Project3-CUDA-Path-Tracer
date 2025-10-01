@@ -23,9 +23,11 @@
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
 
+#define ANTIALIASING 1
 #define SORT_MATERIALS 1
 #define STREAM_COMPACTION 1
 #define BVH 0
+#define DOF 1
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line)
 {
@@ -173,14 +175,35 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         segment.ray.origin = cam.position;
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        // TODO: implement antialiasing by jittering the ray
+        segment.ray.direction = glm::normalize(cam.view
+            - cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+        );
+
         thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, segment.remainingBounces);
         thrust::uniform_real_distribution<float> u01(0, 1);
 
+        // TODO: implement antialiasing by jittering the ray
+#if ANTIALIASING
         segment.ray.direction = glm::normalize(cam.view
             - cam.right * cam.pixelLength.x * ((float)x + (u01(rng) - 0.5f) - (float)cam.resolution.x * 0.5f)
             - cam.up * cam.pixelLength.y * ((float)y + (u01(rng) - 0.5f) - (float)cam.resolution.y * 0.5f)
-        );
+        );  
+#endif
+
+#if DOF
+		// from PBR Chapter 5.2
+        glm::vec3 pLens;
+        pLens.x = cam.lensRadius * u01(rng);
+		pLens.y = cam.lensRadius * u01(rng);
+        pLens.z = 0.0f;
+        //float ft = cam.focalDistance / segment.ray.direction.z;
+		float ft = cam.focalDistance / glm::dot(segment.ray.direction, cam.view);
+        glm::vec3 pFocus = segment.ray.origin + ft * segment.ray.direction;
+
+		segment.ray.origin += pLens;
+		segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
+#endif
 
         segment.pixelIndex = index;
         segment.remainingBounces = traceDepth;
