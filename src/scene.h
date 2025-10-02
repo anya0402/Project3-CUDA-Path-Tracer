@@ -10,6 +10,7 @@ class Scene
 private:
     void loadFromJSON(const std::string& jsonName);
     void loadFromObj(const std::string& pathName, Geom& mesh);
+    int Scene::loadTexture(const std::string pathName, std::string textName);
 public:
     Scene(std::string filename);
 
@@ -18,6 +19,5 @@ public:
 	std::vector<Triangle> triangles;
     std::vector<BVHNode> bvhNodes;
 	std::vector<Texture> textures;
-    std::vector<Texture> textures_norms;
     RenderState state;
 };

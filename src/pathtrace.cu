@@ -8,6 +8,7 @@
 #include <thrust/remove.h>
 #include <thrust/device_ptr.h>
 #include <thrust/partition.h>
+#include <device_launch_parameters.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -17,6 +18,8 @@
 #include "intersections.h"
 #include "interactions.h"
 #include "bvh.h"
+#include "stb_image.h"
+#include "texture_indirect_functions.h"
 
 #define ERRORCHECK 1
 
@@ -24,10 +27,10 @@
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
 
 #define ANTIALIASING 1
-#define SORT_MATERIALS 1
+#define SORT_MATERIALS 0
 #define STREAM_COMPACTION 1
-#define BVH 0
-#define DOF 1
+#define BVH 0   
+#define DOF 0
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line)
 {
@@ -93,8 +96,12 @@ static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 static Triangle* dev_triangles = NULL;
 static BVHNode* dev_bvhNodes = NULL;
+
 static Texture* dev_textures = NULL;
-static Texture* dev_textures_norms = NULL;
+static cudaTextureObject_t* dev_texture_objects = NULL;
+static std::vector<cudaArray_t> dev_cuda_texture_data;
+static std::vector<cudaTextureObject_t> hst_texture_objects;
+
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -132,8 +139,37 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
     cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&dev_textures_norms, scene->textures_norms.size() * sizeof(Texture));
-    cudaMemcpy(dev_textures_norms, scene->textures_norms.data(), scene->textures_norms.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+	dev_cuda_texture_data.resize(scene->textures.size());
+    hst_texture_objects.resize(scene->textures.size());
+
+    //textures
+    for (int i = 0; i < scene->textures.size(); i++) {
+		Texture curr_tex = scene->textures[i];
+		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
+        cudaMallocArray(&dev_cuda_texture_data[i], &channelDesc, scene->textures[i].width, scene->textures[i].height);
+        cudaMemcpyToArray(dev_cuda_texture_data[i], 0, 0, scene->textures[i].data, scene->textures[i].channels * scene->textures[i].width * scene->textures[i].height * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeArray;
+        resDesc.res.array.array = dev_cuda_texture_data[i];
+
+        struct cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.addressMode[0] = cudaAddressModeWrap;
+        texDesc.addressMode[1] = cudaAddressModeWrap;
+        texDesc.filterMode = cudaFilterModeLinear;
+        texDesc.readMode = cudaReadModeNormalizedFloat;
+        texDesc.normalizedCoords = 1;
+
+        cudaCreateTextureObject(&hst_texture_objects[i], &resDesc, &texDesc, NULL);
+        //cudaTextureObject_t texObj = 0;
+        //cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+		//cudaMemcpy(&dev_texture_objects[i], &texObj, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+    }
+
+    cudaMalloc(&dev_texture_objects, scene->textures.size() * sizeof(cudaTextureObject_t));
+    cudaMemcpy(dev_texture_objects, hst_texture_objects.data(), scene->textures.size() * sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
 
 
     checkCUDAError("pathtraceInit");
@@ -150,7 +186,12 @@ void pathtraceFree()
 	cudaFree(dev_triangles);
     cudaFree(dev_bvhNodes);
 	cudaFree(dev_textures);
-	cudaFree(dev_textures_norms);
+
+    for (int i = 0; i < hst_texture_objects.size(); i++) {
+		cudaDestroyTextureObject(hst_texture_objects[i]);
+        cudaFreeArray(dev_cuda_texture_data[i]);
+	}
+    cudaFree(dev_texture_objects);
 
     checkCUDAError("pathtraceFree");
 }
@@ -222,7 +263,9 @@ __global__ void computeIntersections(
     int geoms_size,
     Triangle* triangles,
     ShadeableIntersection* intersections,
-    BVHNode* bvh_nodes)
+    BVHNode* bvh_nodes,
+    Texture* textures,
+    cudaTextureObject_t* texture_objects)
 {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -288,8 +331,8 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = geoms[hit_geom_index].materialid;
             intersections[path_index].surfaceNormal = normal;
-
-            // **TODO Texturing**
+            intersections[path_index].uv = uv;
+            intersections[path_index].textureId = geoms[hit_geom_index].textureIndex;
         }
     }
 }
@@ -308,7 +351,8 @@ __global__ void shadeMaterial(
     int num_paths,
     ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
-    Material* materials)
+    Material* materials,
+    cudaTextureObject_t* texture_objects)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -317,9 +361,6 @@ __global__ void shadeMaterial(
         ShadeableIntersection intersection = shadeableIntersections[idx];
         if (intersection.t > 0.0f) // if the intersection exists...
         {
-            // Set up the RNG
-            // LOOK: this is how you use thrust's RNG! Please look at
-            // makeSeededRandomEngine as well.
             thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, pathSegments[idx].remainingBounces);
             thrust::uniform_real_distribution<float> u01(0, 1);
 
@@ -331,26 +372,31 @@ __global__ void shadeMaterial(
                 return;
             }
 
-            // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
+                // material is a light
                 pathSegments[idx].color *= (materialColor * material.emittance);
-                pathSegments[idx].remainingBounces = 0; //new
+                pathSegments[idx].remainingBounces = 0;
             }
-            // Otherwise, do some pseudo-lighting computation. This is actually more
-            // like what you would expect from shading in a rasterizer like OpenGL.
-            // TODO: replace this! you should be able to start with basically a one-liner
             else {
                 pathSegments[idx].remainingBounces--;
                 glm::vec3 intersect_pt = getPointOnRay(pathSegments[idx].ray, intersection.t);
                 scatterRay(pathSegments[idx], intersect_pt, intersection.surfaceNormal, material, rng);
-                //pathSegments[idx].color = glm::vec3(0.0f);
+                // texturing
+                if (intersection.textureId != -1) {
+					cudaTextureObject_t tex_obj = texture_objects[intersection.textureId];
+					float4 uv_color = tex2D<float4>(tex_obj, intersection.uv.x, intersection.uv.y);
+                    //glm::vec3 uv_color(0.0, 0.0, 0.0);
+					glm::vec3 texture_color = glm::vec3(uv_color.x, uv_color.y, uv_color.z);
+                    pathSegments[idx].color *= texture_color;
+                }
+                else {
+                    pathSegments[idx].color *= material.color;
+                }
+
             }
-            // If there was no intersection, color the ray black.
-            // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
-            // used for opacity, in which case they can indicate "no opacity".
-            // This can be useful for post-processing and image compositing.
         }
         else {
+            // no intersection
             pathSegments[idx].color = glm::vec3(0.0f);
         }
     }
@@ -459,7 +505,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             hst_scene->geoms.size(),
             dev_triangles,
             dev_intersections,
-            dev_bvhNodes
+            dev_bvhNodes,
+            dev_textures,
+			dev_texture_objects
             );
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();
@@ -483,7 +531,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             num_paths,
             dev_intersections,
             dev_paths,
-            dev_materials
+            dev_materials,
+            dev_texture_objects
             );
         checkCUDAError("shader");
         cudaDeviceSynchronize();

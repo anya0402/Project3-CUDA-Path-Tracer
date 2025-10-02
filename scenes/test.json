@@ -98,11 +98,41 @@
       "SCALE": [ 3.0, 3.0, 3.0 ]
     },
     {
-      "TYPE": "cube",
-      "MATERIAL": "diffuse_red",
-      "TRANS": [ 2.0, 5.0, 0.0 ],
+      "TYPE": "sphere",
+      "MATERIAL": "diffuse_white",
+      "TRANS": [ 2.0, 3.0, 6.0 ],
       "ROTAT": [ 0.0, 0.0, 0.0 ],
-      "SCALE": [ 3.0, 3.0, 3.0 ]
+      "SCALE": [ 2.0, 2.0, 2.0 ]
+    },
+
+    {
+      "TYPE": "sphere",
+      "MATERIAL": "glass",
+      "TRANS": [ 1.5, 5.0, 5.0 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 1.5, 1.5, 1.5 ]
+    },
+
+    {
+      "TYPE": "cube",
+      "MATERIAL": "diffuse_green",
+      "TRANS": [ -3.0, 6.0, 3.0 ],
+      "ROTAT": [ 20.0, 30.0, 40.0 ],
+      "SCALE": [ 2.0, 2.0, 2.0 ]
+    },
+    {
+      "TYPE": "cube",
+      "MATERIAL": "glass",
+      "TRANS": [ 2.0, 7.0, 0.0 ],
+      "ROTAT": [ 0.0, 0.0, 0.0 ],
+      "SCALE": [ 4.0, 4.0, 4.0 ]
+    },
+    {
+      "TYPE": "cube",
+      "MATERIAL": "diffuse_white",
+      "TRANS": [ -1.5, 4.0, 5.0 ],
+      "ROTAT": [ 70.0, 30.0, 10.0 ],
+      "SCALE": [ 2.0, 2.0, 2.0 ]
     }
   ]
 }

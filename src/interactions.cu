@@ -126,7 +126,7 @@ __host__ __device__ void scatterRay(
 	glm::vec3 wi = glm::normalize(pathSegment.ray.direction);
     glm::vec3 new_dir(0.0f);
 	normal = glm::normalize(normal);
-    glm::vec3 new_color = m.color;
+    //glm::vec3 new_color = m.color;
 
     thrust::uniform_real_distribution<float> u01(0, 1);
 
@@ -134,7 +134,7 @@ __host__ __device__ void scatterRay(
         // mirror
 		new_dir = reflectRay(wi, normal);
         pathSegment.ray.direction = glm::normalize(new_dir);
-        pathSegment.color *= new_color;
+        //pathSegment.color *= new_color;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
     }
 
@@ -217,7 +217,7 @@ __host__ __device__ void scatterRay(
 
         pathSegment.ray.direction = new_dir;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
-        pathSegment.color *= new_color;
+        //pathSegment.color *= new_color;
     }
 
 
@@ -226,7 +226,7 @@ __host__ __device__ void scatterRay(
 		new_dir = calculateRandomDirectionInHemisphere(normal, rng);
 
         pathSegment.ray.direction = glm::normalize(new_dir);
-        pathSegment.color *= new_color;
+        //pathSegment.color *= new_color;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
         //pathSegment.remainingBounces--;
     }

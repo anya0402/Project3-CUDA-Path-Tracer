@@ -3,6 +3,7 @@
 #include "utilities.h"
 #include "tiny_obj_loader.h"
 #include "bvh.h"
+#include "stb_image.h"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
@@ -12,6 +13,8 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+
+#define BVH 0
 
 using namespace std;
 using json = nlohmann::json;
@@ -93,6 +96,8 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
                 if (idx.texcoord_index >= 0) {
                     tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
                     tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+
+					new_tri.uvs[v] = glm::vec2(tx, ty);
                 }
 
                 // Optional: vertex colors
@@ -113,6 +118,7 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 	mesh.meshStartIdx = triangles.size() - num_triangles;
 	mesh.meshEndIdx = triangles.size() - 1;
 
+#if BVH
     //bvh creation
     BVH bvh_instance(triangles);
     bvh_instance.bvhNodes = new BVHNode[triangles.size() * 2];
@@ -120,10 +126,24 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 
 	int root_offset = bvhNodes.size();
     mesh.bvhRootIdx = root_offset;
+
+	mesh.numNodes = bvh_instance.nodes_used;
+
+	printf("%d nodes used\n", bvh_instance.nodes_used);
+	printf("%d bvhrootidx value\n", root_offset);
+
     for (int i = 0; i < bvh_instance.nodes_used; ++i) {
-		bvhNodes.push_back(bvh_instance.bvhNodes[i]);
+		BVHNode node_to_add = bvh_instance.bvhNodes[i];
+        if (node_to_add.leftChild != -1) {
+			node_to_add.leftChild += root_offset;
+        }
+		if (node_to_add.rightChild != -1) {
+            node_to_add.rightChild += root_offset;
+		}
+		bvhNodes.push_back(node_to_add);
     }
     delete[] bvh_instance.bvhNodes;
+#endif
 }
 
 void Scene::loadFromJSON(const std::string& jsonName)
@@ -189,6 +209,20 @@ void Scene::loadFromJSON(const std::string& jsonName)
 			path_for_obj = source_path + "/" + std::string(p["OBJFILE"]) + ".obj";
 
 			loadFromObj(path_for_obj, newGeom);
+
+            if (p.contains("TEXTURE")) {
+                int texId = loadTexture(path_for_obj, std::string(p["TEXTURE"]));
+                if (texId != -1) {
+                    newGeom.textureIndex = texId;
+                    newGeom.hasTexture = true;
+                }
+                else {
+                    newGeom.hasTexture = false;
+                }
+            }
+            else {
+                newGeom.hasTexture = false;
+			}
         }
         else {
 			newGeom.type = SPHERE;
@@ -243,4 +277,28 @@ void Scene::loadFromJSON(const std::string& jsonName)
     int arraylen = camera.resolution.x * camera.resolution.y;
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
+}
+
+int Scene::loadTexture(std::string pathName, std::string textName) {
+    int width, height, channels;
+    const std::size_t lastSlashPos{ pathName.find_last_of('/') };
+    pathName = pathName.substr(0, lastSlashPos) + std::string("/") + textName;
+
+    unsigned char* data = stbi_load(pathName.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!data) {
+        std::cerr << "Failed to load texture: " << pathName << std::endl;
+        return -1;
+    }
+
+    channels = 4;
+    Texture texture;
+    texture.width = width;
+    texture.height = height;
+    texture.channels = channels;
+    texture.data = data;
+
+    int textureId = textures.size();
+    textures.push_back(texture);
+
+    return textureId;
 }

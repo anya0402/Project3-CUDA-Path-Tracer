@@ -37,6 +37,9 @@ struct Geom
 	int meshStartIdx;
     int meshEndIdx;
 	int bvhRootIdx;
+    int numNodes;
+	int textureIndex = -1;
+	bool hasTexture;
 };
 
 struct Triangle
@@ -45,6 +48,7 @@ struct Triangle
 	glm::vec3 normals[3];
     int materialid;
     glm::vec3 centroid;
+	glm::vec2 uvs[3];
 };
 
 struct Texture
@@ -52,6 +56,8 @@ struct Texture
     int width;
     int height;
     glm::vec3 color;
+	unsigned char* data;
+    int channels;
 };
 
 struct BVHNode {
@@ -117,4 +123,6 @@ struct ShadeableIntersection
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  int textureId = -1;
+  glm::vec2 uv;
 };
