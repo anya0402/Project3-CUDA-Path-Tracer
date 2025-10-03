@@ -508,7 +508,6 @@ __global__ void shadeMaterial(
 				float u = 0.5f + (atan2(env_dir.z, env_dir.x) / (2.0f * PI));
 				float v = 0.5f - (asin(env_dir.y) / PI);
 				cudaTextureObject_t env_obj = env_objects[0];
-
 				float4 uv_color = tex2D<float4>(env_obj, u, v);
                 glm::vec3 env_color = glm::vec3(uv_color.x, uv_color.y, uv_color.z);
                 pathSegments[idx].color *= env_color;
@@ -516,6 +515,7 @@ __global__ void shadeMaterial(
             else {
                 pathSegments[idx].color *= glm::vec3(0.0f);
             }
+			pathSegments[idx].remainingBounces = 0;
             //pathSegments[idx].color = glm::vec3(0.0f);
         }
     }

@@ -297,15 +297,15 @@ void Scene::loadFromJSON(const std::string& jsonName)
 	camera.focalDistance = cameraData["FOCALDIST"];
 
     //environment map
-    if (data.contains("ENVIRONMENT")) {
-		const auto& env_data = data["ENVIRONMENT"];
+    if (data.contains("Environment")) {
+		const auto& env_data = data["Environment"];
         std::string path_for_env;
         auto source_path_env = jsonName.substr(0, jsonName.find_last_of('/'));
         path_for_env = source_path_env + "/" + std::string(env_data["ENVFILE"]);
 
         int envId = loadEnvMap(path_for_env);
         if (envId == -1) {
-            std::cout << "Failed to load environment map: " << std::string(data["ENVIRONMENT"]) << std::endl;
+            std::cout << "Failed to load environment map: " << std::string(data["Environment"]) << std::endl;
         }
 	}
 
@@ -377,12 +377,13 @@ int Scene::loadBumpMap(const std::string pathName, const std::string textName) {
 
 int Scene::loadEnvMap(const std::string pathName) {
     int width, height, channels;
-    //stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(true);
 
    /* const std::size_t lastSlashPos{ pathName.find_last_of('/') };
     std::string fullPath = pathName.substr(0, lastSlashPos) + std::string("/") + textName;*/
 
     unsigned char* data = stbi_load(pathName.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    //float* data = stbi_loadf(pathName.c_str(), &width, &height, &channels, 0);
     if (!data) {
         std::cerr << "Failed to load environment map: " << pathName << std::endl;
         return -1;

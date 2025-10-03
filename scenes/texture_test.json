@@ -47,6 +47,9 @@
     "FOCALDIST": 10.0
 
   },
+  "Environment": {
+    "ENVFILE": "sky_env_hdr.hdr"
+  },
   "Objects": [
     {
       "TYPE": "cube",
