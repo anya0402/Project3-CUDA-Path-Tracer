@@ -80,11 +80,14 @@ __host__ __device__ float meshIntersectionTest(
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
 	glm::vec2& uv,
+	glm::vec3& tangent,
+	glm::vec3& bitangent,
     bool& outside);
 
 __host__ __device__ float BVHIntersectionTest
 (Geom mesh,
     Triangle* triangles,
+    int* triangles_idx,
     Ray r,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,

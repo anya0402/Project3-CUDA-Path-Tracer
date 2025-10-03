@@ -14,8 +14,6 @@
 #include <string>
 #include <unordered_map>
 
-#define BVH 0
-
 using namespace std;
 using json = nlohmann::json;
 
@@ -100,6 +98,8 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 					new_tri.uvs[v] = glm::vec2(tx, ty);
                 }
 
+                
+
                 // Optional: vertex colors
                 // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
                 // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
@@ -111,6 +111,23 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
             int new_materialid = shapes[s].mesh.material_ids[f];
             new_tri.materialid = new_materialid >= 0 ? new_materialid : -1;
 
+            // tangents and bitangents
+            glm::vec3 edge1 = new_tri.vertices[1] - new_tri.vertices[0];
+            glm::vec3 edge2 = new_tri.vertices[2] - new_tri.vertices[0];
+            glm::vec2 deltaUV1 = new_tri.uvs[1] - new_tri.uvs[0];
+            glm::vec2 deltaUV2 = new_tri.uvs[2] - new_tri.uvs[0];
+            float tan_f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+            glm::vec3 tangent;
+            glm::vec3 bitangent;
+            tangent.x = tan_f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+            tangent.y = tan_f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+            tangent.z = tan_f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+            bitangent.x = tan_f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+            bitangent.y = tan_f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+            bitangent.z = tan_f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+            new_tri.tangent = glm::normalize(tangent);
+            new_tri.bitangent = glm::normalize(bitangent);
+
             triangles.push_back(new_tri);
         }
     }
@@ -118,7 +135,6 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 	mesh.meshStartIdx = triangles.size() - num_triangles;
 	mesh.meshEndIdx = triangles.size() - 1;
 
-#if BVH
     //bvh creation
     BVH bvh_instance(triangles);
     bvh_instance.bvhNodes = new BVHNode[triangles.size() * 2];
@@ -129,8 +145,7 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 
 	mesh.numNodes = bvh_instance.nodes_used;
 
-	printf("%d nodes used\n", bvh_instance.nodes_used);
-	printf("%d bvhrootidx value\n", root_offset);
+	
 
     for (int i = 0; i < bvh_instance.nodes_used; ++i) {
 		BVHNode node_to_add = bvh_instance.bvhNodes[i];
@@ -142,8 +157,10 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 		}
 		bvhNodes.push_back(node_to_add);
     }
+
+	triangles_idx.insert(triangles_idx.end(), bvh_instance.triangles_idx.begin(), bvh_instance.triangles_idx.end());
+
     delete[] bvh_instance.bvhNodes;
-#endif
 }
 
 void Scene::loadFromJSON(const std::string& jsonName)
@@ -210,6 +227,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
 
 			loadFromObj(path_for_obj, newGeom);
 
+            //texture
             if (p.contains("TEXTURE")) {
                 int texId = loadTexture(path_for_obj, std::string(p["TEXTURE"]));
                 if (texId != -1) {
@@ -223,6 +241,23 @@ void Scene::loadFromJSON(const std::string& jsonName)
             else {
                 newGeom.hasTexture = false;
 			}
+
+            // bump map
+            if (p.contains("BUMP")) {
+                int normalId = loadBumpMap(path_for_obj, std::string(p["BUMP"]));
+                if (normalId != -1) {
+                    newGeom.normalIndex = normalId;
+                    newGeom.hasNormal = true;
+                }
+                else {
+                    newGeom.hasNormal = false;
+                }
+            }
+            else {
+                newGeom.hasNormal = false;
+            }
+
+
         }
         else {
 			newGeom.type = SPHERE;
@@ -260,6 +295,19 @@ void Scene::loadFromJSON(const std::string& jsonName)
     //depth of field
 	camera.lensRadius = cameraData["RADIUS"];
 	camera.focalDistance = cameraData["FOCALDIST"];
+
+    //environment map
+    if (data.contains("ENVIRONMENT")) {
+		const auto& env_data = data["ENVIRONMENT"];
+        std::string path_for_env;
+        auto source_path_env = jsonName.substr(0, jsonName.find_last_of('/'));
+        path_for_env = source_path_env + "/" + std::string(env_data["ENVFILE"]);
+
+        int envId = loadEnvMap(path_for_env);
+        if (envId == -1) {
+            std::cout << "Failed to load environment map: " << std::string(data["ENVIRONMENT"]) << std::endl;
+        }
+	}
 
     //calculate fov based on resolution
     float yscaled = tan(fovy * (PI / 180));
@@ -301,4 +349,54 @@ int Scene::loadTexture(std::string pathName, std::string textName) {
     textures.push_back(texture);
 
     return textureId;
+}
+
+int Scene::loadBumpMap(const std::string pathName, const std::string textName) {
+    int width, height, channels;
+    const std::size_t lastSlashPos{ pathName.find_last_of('/') };
+    std::string fullPath = pathName.substr(0, lastSlashPos) + std::string("/") + textName;
+
+    unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!data) {
+        std::cerr << "Failed to load bump map: " << fullPath << std::endl;
+        return -1;
+    }
+
+    //channels = 4;
+    Texture normal;
+    normal.width = width;
+    normal.height = height;
+    normal.channels = channels;
+    normal.data = data;
+
+    int normalId = normals.size();
+    normals.push_back(normal);
+
+    return normalId;
+}
+
+int Scene::loadEnvMap(const std::string pathName) {
+    int width, height, channels;
+    //stbi_set_flip_vertically_on_load(true);
+
+   /* const std::size_t lastSlashPos{ pathName.find_last_of('/') };
+    std::string fullPath = pathName.substr(0, lastSlashPos) + std::string("/") + textName;*/
+
+    unsigned char* data = stbi_load(pathName.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!data) {
+        std::cerr << "Failed to load environment map: " << pathName << std::endl;
+        return -1;
+    }
+
+    //channels = 4;
+    Texture env_map;
+    env_map.width = width;
+    env_map.height = height;
+    env_map.channels = channels;
+    env_map.data = data;
+
+    int envId = env_maps.size();
+    env_maps.push_back(env_map);
+
+    return envId;
 }

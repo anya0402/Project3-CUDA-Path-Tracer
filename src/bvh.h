@@ -27,11 +27,11 @@ public:
 	void constructBVH();
 	BVHNode* bvhNodes;
 	int nodes_used;
+	std::vector<int> triangles_idx;
 
 private:
 	void updateBVHBounds(int node_idx);
 	void subdivideBVH(int node_idx);
 	const std::vector<Triangle>& mesh_triangles;
-	std::vector<int> triangles_idx;
 	int N;
 };

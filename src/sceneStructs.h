@@ -40,6 +40,8 @@ struct Geom
     int numNodes;
 	int textureIndex = -1;
 	bool hasTexture;
+	int normalIndex = -1;
+    int hasNormal;
 };
 
 struct Triangle
@@ -49,6 +51,8 @@ struct Triangle
     int materialid;
     glm::vec3 centroid;
 	glm::vec2 uvs[3];
+	glm::vec3 tangent;
+	glm::vec3 bitangent;
 };
 
 struct Texture
@@ -125,4 +129,7 @@ struct ShadeableIntersection
   int materialId;
   int textureId = -1;
   glm::vec2 uv;
+  int normalId = -1;
+  glm::vec3 tangent;
+  glm::vec3 bitangent;
 };

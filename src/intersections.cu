@@ -121,6 +121,8 @@ __host__ __device__ float meshIntersectionTest
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
     glm::vec2& uv,
+	glm::vec3& tangent,
+	glm::vec3& bitangent,
     bool& outside)
 {
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
@@ -129,6 +131,8 @@ __host__ __device__ float meshIntersectionTest
     float tmin = tmax;
     glm::vec3 baryNorm;
     glm::vec2 new_uv;
+	glm::vec3 new_tangent;
+	glm::vec3 new_bitangent;
 
     Ray rt;
     rt.origin = ro;
@@ -154,6 +158,11 @@ __host__ __device__ float meshIntersectionTest
                     new_uv = (1.0f - baryPos.x - baryPos.y) * curr_tri.uvs[0]
                         + baryPos.x * curr_tri.uvs[1] + baryPos.y * curr_tri.uvs[2];
                 }
+                //bump map
+                if (mesh.hasNormal) {
+                    new_tangent = curr_tri.tangent;
+					new_bitangent = curr_tri.bitangent;
+                }
             }
         }
     }
@@ -164,6 +173,8 @@ __host__ __device__ float meshIntersectionTest
         intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(rt, tmin), 1.0f));
         normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(baryNorm, 0.0f)));
         uv = new_uv;
+		tangent = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(new_tangent, 0.0f)));
+		bitangent = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(new_bitangent, 0.0f)));
         return glm::length(r.origin - intersectionPoint);
     }
 
@@ -172,8 +183,9 @@ __host__ __device__ float meshIntersectionTest
 }
 
 __host__ __device__ float BVHIntersectionTest
-(Geom mesh,
+    (Geom mesh,
     Triangle* triangles,
+    int* triangles_idx,
     Ray r,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
@@ -204,7 +216,7 @@ __host__ __device__ float BVHIntersectionTest
 
         if (curr_node.triangleCount > 0) {
             for (int i = curr_node.firstTriangleIdx; i < curr_node.firstTriangleIdx + curr_node.triangleCount; ++i) {
-                Triangle curr_tri = triangles[i];
+                Triangle curr_tri = triangles[triangles_idx[i]];
                 glm::vec3 baryPos;
                 bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction,
                     curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);

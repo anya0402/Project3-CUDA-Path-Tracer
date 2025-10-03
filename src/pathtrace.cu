@@ -29,7 +29,7 @@
 #define ANTIALIASING 1
 #define SORT_MATERIALS 0
 #define STREAM_COMPACTION 1
-#define BVH 0   
+#define BVH 0
 #define DOF 0
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line)
@@ -95,12 +95,23 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 static Triangle* dev_triangles = NULL;
+static int* dev_triangles_idx = NULL;
 static BVHNode* dev_bvhNodes = NULL;
 
 static Texture* dev_textures = NULL;
 static cudaTextureObject_t* dev_texture_objects = NULL;
 static std::vector<cudaArray_t> dev_cuda_texture_data;
 static std::vector<cudaTextureObject_t> hst_texture_objects;
+
+static Texture* dev_normals = NULL;
+static cudaTextureObject_t* dev_normal_objects = NULL;
+static std::vector<cudaArray_t> dev_normal_data;
+static std::vector<cudaTextureObject_t> hst_normal_objects;
+
+static Texture* dev_env_maps = NULL;
+static cudaTextureObject_t* dev_env_objects = NULL;
+static std::vector<cudaArray_t> dev_env_data;
+static std::vector<cudaTextureObject_t> hst_env_objects;
 
 
 void InitDataContainer(GuiDataContainer* imGuiData)
@@ -133,16 +144,17 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
     cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
+    cudaMalloc(&dev_triangles_idx, scene->triangles_idx.size() * sizeof(int));
+    cudaMemcpy(dev_triangles_idx, scene->triangles_idx.data(), scene->triangles_idx.size() * sizeof(int), cudaMemcpyHostToDevice);
+
     cudaMalloc(&dev_bvhNodes, scene->bvhNodes.size() * sizeof(BVHNode));
     cudaMemcpy(dev_bvhNodes, scene->bvhNodes.data(), scene->bvhNodes.size() * sizeof(BVHNode), cudaMemcpyHostToDevice);
 
+    //textures
     cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
     cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
-
 	dev_cuda_texture_data.resize(scene->textures.size());
     hst_texture_objects.resize(scene->textures.size());
-
-    //textures
     for (int i = 0; i < scene->textures.size(); i++) {
 		Texture curr_tex = scene->textures[i];
 		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
@@ -163,13 +175,68 @@ void pathtraceInit(Scene* scene)
         texDesc.normalizedCoords = 1;
 
         cudaCreateTextureObject(&hst_texture_objects[i], &resDesc, &texDesc, NULL);
-        //cudaTextureObject_t texObj = 0;
-        //cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
-		//cudaMemcpy(&dev_texture_objects[i], &texObj, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
     }
-
     cudaMalloc(&dev_texture_objects, scene->textures.size() * sizeof(cudaTextureObject_t));
     cudaMemcpy(dev_texture_objects, hst_texture_objects.data(), scene->textures.size() * sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+
+    //bump map
+    cudaMalloc(&dev_normals, scene->normals.size() * sizeof(Texture));
+    cudaMemcpy(dev_normals, scene->normals.data(), scene->normals.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+    dev_normal_data.resize(scene->normals.size());
+    hst_normal_objects.resize(scene->normals.size());
+    for (int i = 0; i < scene->normals.size(); i++) {
+        Texture curr_normal = scene->normals[i];
+        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
+        cudaMallocArray(&dev_normal_data[i], &channelDesc, curr_normal.width, curr_normal.height);
+        cudaMemcpyToArray(dev_normal_data[i], 0, 0, curr_normal.data, curr_normal.channels * curr_normal.width * curr_normal.height * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeArray;
+        resDesc.res.array.array = dev_normal_data[i];
+
+        struct cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.addressMode[0] = cudaAddressModeWrap;
+        texDesc.addressMode[1] = cudaAddressModeWrap;
+        texDesc.filterMode = cudaFilterModeLinear;
+        texDesc.readMode = cudaReadModeNormalizedFloat;
+        texDesc.normalizedCoords = 1;
+
+        cudaCreateTextureObject(&hst_normal_objects[i], &resDesc, &texDesc, NULL);
+    }
+    cudaMalloc(&dev_normal_objects, scene->normals.size() * sizeof(cudaTextureObject_t));
+    cudaMemcpy(dev_normal_objects, hst_normal_objects.data(), scene->normals.size() * sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+
+    //environment map
+    cudaMalloc(&dev_env_maps, scene->env_maps.size() * sizeof(Texture));
+    cudaMemcpy(dev_env_maps, scene->env_maps.data(), scene->env_maps.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+    dev_env_data.resize(scene->env_maps.size());
+    hst_env_objects.resize(scene->env_maps.size());
+
+    for (int i = 0; i < scene->env_maps.size(); i++) {
+        Texture curr_env = scene->env_maps[i];
+        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
+        cudaMallocArray(&dev_env_data[i], &channelDesc, curr_env.width, curr_env.height);
+        cudaMemcpyToArray(dev_env_data[i], 0, 0, curr_env.data, curr_env.channels * curr_env.width * curr_env.height * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeArray;
+        resDesc.res.array.array = dev_env_data[i];
+
+        struct cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.addressMode[0] = cudaAddressModeWrap;
+        texDesc.addressMode[1] = cudaAddressModeClamp;   // better for env maps
+        texDesc.filterMode = cudaFilterModeLinear;
+        texDesc.readMode = cudaReadModeNormalizedFloat;
+        texDesc.normalizedCoords = 1;
+        cudaCreateTextureObject(&hst_env_objects[i], &resDesc, &texDesc, NULL);
+    }
+    cudaMalloc(&dev_env_objects, scene->env_maps.size() * sizeof(cudaTextureObject_t));
+    cudaMemcpy(dev_env_objects, hst_env_objects.data(), scene->env_maps.size() * sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+
 
 
     checkCUDAError("pathtraceInit");
@@ -184,14 +251,29 @@ void pathtraceFree()
     cudaFree(dev_intersections);
     // TODO: clean up any extra device memory you created
 	cudaFree(dev_triangles);
+	cudaFree(dev_triangles_idx);
     cudaFree(dev_bvhNodes);
 	cudaFree(dev_textures);
+	cudaFree(dev_env_maps);
+	cudaFree(dev_normals);
 
     for (int i = 0; i < hst_texture_objects.size(); i++) {
 		cudaDestroyTextureObject(hst_texture_objects[i]);
         cudaFreeArray(dev_cuda_texture_data[i]);
 	}
     cudaFree(dev_texture_objects);
+
+    for (int i = 0; i < hst_normal_objects.size(); i++) {
+        cudaDestroyTextureObject(hst_normal_objects[i]);
+        cudaFreeArray(dev_normal_data[i]);
+    }
+    cudaFree(dev_normal_objects);
+
+    for (int i = 0; i < hst_env_objects.size(); i++) {
+        cudaDestroyTextureObject(hst_env_objects[i]);
+        cudaFreeArray(dev_env_data[i]);
+    }
+    cudaFree(dev_env_objects);
 
     checkCUDAError("pathtraceFree");
 }
@@ -262,6 +344,7 @@ __global__ void computeIntersections(
     Geom* geoms,
     int geoms_size,
     Triangle* triangles,
+	int* triangles_idx,
     ShadeableIntersection* intersections,
     BVHNode* bvh_nodes,
     Texture* textures,
@@ -277,6 +360,8 @@ __global__ void computeIntersections(
         glm::vec3 intersect_point;
         glm::vec3 normal;
         glm::vec2 uv(-1.f);
+        glm::vec3 tangent;
+        glm::vec3 bitangent;
         float t_min = FLT_MAX;
         int hit_geom_index = -1;
         bool outside = true;
@@ -284,6 +369,8 @@ __global__ void computeIntersections(
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
 		glm::vec2 tmp_uv;
+        glm::vec3 tmp_tangent;
+        glm::vec3 tmp_bitangent;
 
         // naive parse through global geoms
 
@@ -303,9 +390,10 @@ __global__ void computeIntersections(
             else if (geom.type == MESH)
             {
 #if BVH
-                t = BVHIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, bvh_nodes);
+
+				t = BVHIntersectionTest(geom, triangles, triangles_idx, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, bvh_nodes);
 #else
-                t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+                t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, tmp_bitangent, outside);
 #endif
 			}
 
@@ -318,6 +406,8 @@ __global__ void computeIntersections(
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
 				uv = tmp_uv;
+                tangent = tmp_tangent;
+                bitangent = tmp_bitangent;
             }
         }
 
@@ -333,6 +423,10 @@ __global__ void computeIntersections(
             intersections[path_index].surfaceNormal = normal;
             intersections[path_index].uv = uv;
             intersections[path_index].textureId = geoms[hit_geom_index].textureIndex;
+            intersections[path_index].tangent = tangent;
+            intersections[path_index].bitangent = bitangent;
+			intersections[path_index].normalId = geoms[hit_geom_index].normalIndex;
+
         }
     }
 }
@@ -352,7 +446,9 @@ __global__ void shadeMaterial(
     ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
     Material* materials,
-    cudaTextureObject_t* texture_objects)
+    cudaTextureObject_t* texture_objects,
+    cudaTextureObject_t* normal_objects,
+    cudaTextureObject_t* env_objects)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -378,14 +474,24 @@ __global__ void shadeMaterial(
                 pathSegments[idx].remainingBounces = 0;
             }
             else {
+                //bump map
+                if (intersection.normalId != -1) {
+                    cudaTextureObject_t normal_obj = normal_objects[intersection.normalId];
+                    float4 uv_normal = tex2D<float4>(normal_obj, intersection.uv.x, intersection.uv.y);
+					glm::vec3 tan_normal = glm::vec3(uv_normal.x, uv_normal.y, uv_normal.z);
+					tan_normal = glm::normalize(tan_normal * 2.0f - 1.0f);
+					glm::mat3 TBN = glm::mat3(intersection.tangent, intersection.bitangent, intersection.surfaceNormal);
+					intersection.surfaceNormal = glm::normalize(TBN * tan_normal);
+                }
+
                 pathSegments[idx].remainingBounces--;
                 glm::vec3 intersect_pt = getPointOnRay(pathSegments[idx].ray, intersection.t);
                 scatterRay(pathSegments[idx], intersect_pt, intersection.surfaceNormal, material, rng);
+
                 // texturing
                 if (intersection.textureId != -1) {
 					cudaTextureObject_t tex_obj = texture_objects[intersection.textureId];
 					float4 uv_color = tex2D<float4>(tex_obj, intersection.uv.x, intersection.uv.y);
-                    //glm::vec3 uv_color(0.0, 0.0, 0.0);
 					glm::vec3 texture_color = glm::vec3(uv_color.x, uv_color.y, uv_color.z);
                     pathSegments[idx].color *= texture_color;
                 }
@@ -396,8 +502,21 @@ __global__ void shadeMaterial(
             }
         }
         else {
-            // no intersection
-            pathSegments[idx].color = glm::vec3(0.0f);
+            // no intersection -> environment map
+            if (env_objects != NULL) {
+				glm::vec3 env_dir = glm::normalize(pathSegments[idx].ray.direction);
+				float u = 0.5f + (atan2(env_dir.z, env_dir.x) / (2.0f * PI));
+				float v = 0.5f - (asin(env_dir.y) / PI);
+				cudaTextureObject_t env_obj = env_objects[0];
+
+				float4 uv_color = tex2D<float4>(env_obj, u, v);
+                glm::vec3 env_color = glm::vec3(uv_color.x, uv_color.y, uv_color.z);
+                pathSegments[idx].color *= env_color;
+            }
+            else {
+                pathSegments[idx].color *= glm::vec3(0.0f);
+            }
+            //pathSegments[idx].color = glm::vec3(0.0f);
         }
     }
 }
@@ -504,6 +623,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_geoms,
             hst_scene->geoms.size(),
             dev_triangles,
+            dev_triangles_idx,
             dev_intersections,
             dev_bvhNodes,
             dev_textures,
@@ -532,7 +652,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_intersections,
             dev_paths,
             dev_materials,
-            dev_texture_objects
+            dev_texture_objects,
+            dev_normal_objects,
+            dev_env_objects
             );
         checkCUDAError("shader");
         cudaDeviceSynchronize();
