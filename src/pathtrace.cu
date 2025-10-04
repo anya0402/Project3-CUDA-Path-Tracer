@@ -495,6 +495,20 @@ __global__ void shadeMaterial(
 					glm::vec3 texture_color = glm::vec3(uv_color.x, uv_color.y, uv_color.z);
                     pathSegments[idx].color *= texture_color;
                 }
+
+                if (material.isProcedural) {
+                    // checkerboard procedural texture
+                    float scale_factor = material.checker_scale;
+                    glm::vec3 color1 = material.checker_color1;
+                    glm::vec3 color2 = material.checker_color2;
+                    glm::vec2 uv = intersection.uv * scale_factor;
+                    int u = (int)floor(uv.x);
+                    int v = (int)floor(uv.y);
+                    bool even = ((u + v) % 2 == 0);
+                    glm::vec3 check_color = even ? color1 : color2;
+                    pathSegments[idx].color *= check_color;
+                }
+
                 else {
                     pathSegments[idx].color *= material.color;
                 }

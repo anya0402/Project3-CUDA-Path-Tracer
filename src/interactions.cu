@@ -115,6 +115,7 @@ __host__ __device__ float fresnelRay(float cosTheta_val, float eta_i, float eta_
     return (r_parl * r_parl + r_perp * r_perp) * 0.5f;
 }
 
+
 __host__ __device__ void scatterRay(
     PathSegment & pathSegment,
     glm::vec3 intersect,
@@ -126,7 +127,6 @@ __host__ __device__ void scatterRay(
 	glm::vec3 wi = glm::normalize(pathSegment.ray.direction);
     glm::vec3 new_dir(0.0f);
 	normal = glm::normalize(normal);
-    //glm::vec3 new_color = m.color;
 
     thrust::uniform_real_distribution<float> u01(0, 1);
 
@@ -134,7 +134,6 @@ __host__ __device__ void scatterRay(
         // mirror
 		new_dir = reflectRay(wi, normal);
         pathSegment.ray.direction = glm::normalize(new_dir);
-        //pathSegment.color *= new_color;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
     }
 
@@ -168,56 +167,8 @@ __host__ __device__ void scatterRay(
 			new_dir = glm::refract(wi, normal, eta);
         }
 
-
-        // world to local coordinates approach
-       
-   //     float eta_i = m.indexOfRefraction;
-   //     float eta_t = 1.f; // outer material (air)
-   //     glm::vec3 w_local = -pathSegment.ray.direction;
-   //     w_local = worldToLocalCoords(normal, w_local);
-   //     float cosTheta_val = w_local.z;
-   //     float fresnel_val = fresnelRay(cosTheta_val, eta_i, eta_t);
-   //     float t = 1.0f - fresnel_val;
-   //     glm::vec3 normal_local(0, 0, 1);
-   //     if (glm::dot(normal_local, w_local) < 0) {
-   //         normal_local = -normal_local;
-   //     }
-   //     if (u01(rng) < fresnel_val) {
-   //         //reflect using fresnel
-			//new_dir = glm::reflect(w_local, normal_local);
-   //         t = fresnel_val;
-			//new_color = m.color * t / abs(new_dir.z);
-   //     }
-   //     else {
-			////refract
-   //         bool entering = cosTheta_val <= 0;
-   //         if (entering) {
-   //             float temp = eta_i;
-   //             eta_i = eta_t;
-   //             eta_t = temp;
-   //         }
-   //         float eta = eta_i / eta_t;
-			//glm::vec3 normal_local(0, 0, 1);
-   //         if (glm::dot(normal_local, w_local) < 0) {
-   //             normal_local = -normal_local;
-   //         }
-   //         new_dir = glm::refract(w_local, normal_local, eta);
-   //         if (new_dir == glm::vec3(0.0f)) {
-   //             pathSegment.remainingBounces = 0;
-   //             return;
-   //         }
-   //         else {
-   //             glm::vec3 ft = m.color * t;
-			//	new_color = ft / abs(new_dir.z);
-   //         }
-   //     }
-   //     glm::vec3 wi_world = localToWorldCoords(normal, new_dir);
-   //     new_dir = glm::normalize(wi_world);
-   //     new_color = new_color * glm::abs(glm::dot(wi_world, normal)) / t;
-
         pathSegment.ray.direction = new_dir;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
-        //pathSegment.color *= new_color;
     }
 
 
@@ -226,16 +177,6 @@ __host__ __device__ void scatterRay(
 		new_dir = calculateRandomDirectionInHemisphere(normal, rng);
 
         pathSegment.ray.direction = glm::normalize(new_dir);
-        //pathSegment.color *= new_color;
         pathSegment.ray.origin = intersect + pathSegment.ray.direction * .005f;
-        //pathSegment.remainingBounces--;
     }
-
-    // original diffuse
-	//glm::vec3 wi = calculateRandomDirectionInHemisphere(normal, rng);
-	//pathSegment.ray.origin = intersect;
-	//pathSegment.color *= m.color;
-	//pathSegment.ray.direction = wi;
-	//pathSegment.remainingBounces--;
-
 }

@@ -32,6 +32,13 @@
       "RGB": [ 0.98, 0.98, 0.98 ],
       "ROUGHNESS": 0.0,
       "IOR": 1.5
+    },
+    "procedural": {
+      "TYPE": "Procedural",
+      "RGB": [ 0.98, 0.98, 0.98 ],
+      "CHECKER_COLOR1": [ 0.949, 0.616, 0.773 ],
+      "CHECKER_COLOR2": [ 0.592, 0.859, 0.949 ],
+      "CHECKER_SIZE": 15.0
     }
   },
   "Camera": {
@@ -95,23 +102,11 @@
     },
     {
       "TYPE": "mesh",
-      "MATERIAL": "diffuse_white",
+      "MATERIAL": "procedural",
       "TRANS": [ -1.0, 2.0, -5.0 ],
       "ROTAT": [ 0.0, 0.0, 0.0 ],
       "SCALE": [ 3, 3, 3 ],
-      "OBJFILE": "dodecahedron",
-      "TEXTURE": "broken_brick_texture.jpg",
-      "BUMP": "brick_normal_texture.jpg"
-    },
-    {
-      "TYPE": "mesh",
-      "MATERIAL": "diffuse_white",
-      "TRANS": [ -1.0, 2.0, -4.0 ],
-      "ROTAT": [ 0.0, 0.0, 0.0 ],
-      "SCALE": [ 3, 3, 3 ],
-      "OBJFILE": "cube_obj",
-      "TEXTURE": "broken_brick_texture.jpg",
-      "BUMP": "brick_normal_texture.jpg"
+      "OBJFILE": "cube_obj"
     }
   ]
 }

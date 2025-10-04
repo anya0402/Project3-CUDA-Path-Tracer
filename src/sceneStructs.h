@@ -86,6 +86,11 @@ struct Material
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    bool isProcedural = false;
+    glm::vec3 checker_color1;
+	glm::vec3 checker_color2;
+    float checker_scale;
 };
 
 struct Camera

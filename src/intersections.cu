@@ -154,7 +154,7 @@ __host__ __device__ float meshIntersectionTest
                 baryNorm = glm::normalize(baryNorm_val);
 
                 //textures
-                if (mesh.hasTexture) {
+                if (true) {
                     new_uv = (1.0f - baryPos.x - baryPos.y) * curr_tri.uvs[0]
                         + baryPos.x * curr_tri.uvs[1] + baryPos.y * curr_tri.uvs[2];
                 }

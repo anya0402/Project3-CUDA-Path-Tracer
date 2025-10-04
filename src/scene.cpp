@@ -205,6 +205,18 @@ void Scene::loadFromJSON(const std::string& jsonName)
 			newMaterial.indexOfRefraction = p["IOR"];
 			newMaterial.hasReflective = 1.f;
         }
+        else if (p["TYPE"] == "Procedural")
+        {
+            const auto& col = p["RGB"];
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
+            newMaterial.isProcedural = true;
+			const auto& col1 = p["CHECKER_COLOR1"];
+			newMaterial.checker_color1 = glm::vec3(col1[0], col1[1], col1[2]);
+			const auto& col2 = p["CHECKER_COLOR2"];
+			newMaterial.checker_color2 = glm::vec3(col2[0], col2[1], col2[2]);
+            newMaterial.checker_scale = p["CHECKER_SIZE"];
+        }
+
         MatNameToID[name] = materials.size();
         materials.emplace_back(newMaterial);
     }
