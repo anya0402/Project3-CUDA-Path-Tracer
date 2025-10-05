@@ -1,13 +1,41 @@
-CUDA Path Tracer
+    CUDA Path Tracer
 ================
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* Anya Agarwal
+  * [LinkedIn](https://www.linkedin.com/in/anya-agarwal/)
+* Tested on: Windows 11, AMD Ryzen 7 260 @ 380GHz 16GB, RTX 5060
 
-### (TODO: Your README)
+# GPU CUDA Path Tracer
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
+## Overview
+
+Core Features
+* Ideal Diffuse Surface Shading
+* Rays, Paths, and Intersections Contiguous in Memory
+* Stochastic Sampled Antialiasing
+
+Additional Features
+* Refraction with Fresnel effects
+* Physically-based Depth-of-Field
+* Texture Mapping, Bump Mapping, and Procedural Texturing
+* Arbitrary Mesh Loading and Rendering
+* Hierarichal Spatial Data Structures
+
+## Feature Overview and Analysis
+
+### Refraction with Fresnel effects
+
+### Physically-based Depth-of-Field
+
+### Texture Mapping, Bump Mapping, and Procedural Texturing
+
+### Arbitrary Mesh Loading and Rendering
+
+### Hierarichal Spatial Data Structures
+
+
+## Performance Analysis
+
 
