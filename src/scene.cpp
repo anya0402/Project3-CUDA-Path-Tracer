@@ -20,6 +20,7 @@ using json = nlohmann::json;
 Scene::Scene(string filename)
 {
     cout << "Reading scene from " << filename << " ..." << endl;
+    cout << "build again ..." << endl;
     cout << " " << endl;
     auto ext = filename.substr(filename.find_last_of('.'));
     if (ext == ".json")
@@ -135,32 +136,36 @@ void Scene::loadFromObj(const std::string& pathName, Geom& mesh)
 	mesh.meshStartIdx = triangles.size() - num_triangles;
 	mesh.meshEndIdx = triangles.size() - 1;
 
-    //bvh creation
-    BVH bvh_instance(triangles);
-    bvh_instance.bvhNodes = new BVHNode[triangles.size() * 2];
+    std::vector<Triangle> bvh_triangles;
+    bvh_triangles.reserve(num_triangles);
+    for (int i = 0; i < num_triangles; ++i)
+        bvh_triangles.push_back(triangles[mesh.meshStartIdx + i]);
+
+    BVH bvh_instance(bvh_triangles);
     bvh_instance.constructBVH();
 
-	int root_offset = bvhNodes.size();
-    mesh.bvhRootIdx = root_offset;
+    int node_offset = (int)bvhNodes.size();
+    mesh.bvhRootIdx = node_offset;
+    mesh.numNodes = (int)bvh_instance.bvhNodes.size();
 
-	mesh.numNodes = bvh_instance.nodes_used;
+    int tri_offset = (int)triangles_idx.size();
 
-	
-
-    for (int i = 0; i < bvh_instance.nodes_used; ++i) {
-		BVHNode node_to_add = bvh_instance.bvhNodes[i];
-        if (node_to_add.leftChild != -1) {
-			node_to_add.leftChild += root_offset;
+    for (int i = 0; i < (int)bvh_instance.bvhNodes.size(); ++i) {
+        BVHNode node = bvh_instance.bvhNodes[i];
+        if (node.leftChild != -1) {
+            node.leftChild += node_offset;
         }
-		if (node_to_add.rightChild != -1) {
-            node_to_add.rightChild += root_offset;
-		}
-		bvhNodes.push_back(node_to_add);
+        if (node.rightChild != -1) {
+            node.rightChild += node_offset;
+        }
+        node.firstTriangleIdx += tri_offset;
+        bvhNodes.push_back(node);
     }
 
-	triangles_idx.insert(triangles_idx.end(), bvh_instance.triangles_idx.begin(), bvh_instance.triangles_idx.end());
+    for (int bvh_tri_idx : bvh_instance.triangles_idx) {
+        triangles_idx.push_back(mesh.meshStartIdx + bvh_tri_idx);
+    }
 
-    delete[] bvh_instance.bvhNodes;
 }
 
 void Scene::loadFromJSON(const std::string& jsonName)

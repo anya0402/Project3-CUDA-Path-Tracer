@@ -29,7 +29,7 @@
 #define ANTIALIASING 1
 #define SORT_MATERIALS 0
 #define STREAM_COMPACTION 1
-#define BVH 0
+#define BVH 1
 #define DOF 0
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line)
@@ -391,7 +391,7 @@ __global__ void computeIntersections(
             {
 #if BVH
 
-				t = BVHIntersectionTest(geom, triangles, triangles_idx, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, bvh_nodes);
+				t = BVHIntersectionTest(geom, triangles, triangles_idx, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, tmp_bitangent, outside, bvh_nodes);
 #else
                 t = meshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, tmp_bitangent, outside);
 #endif

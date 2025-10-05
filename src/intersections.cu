@@ -182,22 +182,44 @@ __host__ __device__ float meshIntersectionTest
     return -1;
 }
 
+__host__ __device__ bool intersectAABB(const Ray& ray, const glm::vec3 bmin, const glm::vec3 bmax, float t)
+{
+    // slab test
+	glm::vec3 invD = 1.0f / ray.direction;
+    float tx1 = (bmin.x - ray.origin.x) * invD.x, tx2 = (bmax.x - ray.origin.x) * invD.x;
+    float tmin = glm::min(tx1, tx2), tmax = glm::max(tx1, tx2);
+    float ty1 = (bmin.y - ray.origin.y) * invD.y, ty2 = (bmax.y - ray.origin.y) * invD.y;
+    tmin = glm::max(tmin, glm::min(ty1, ty2)), tmax = glm::min(tmax, glm::max(ty1, ty2));
+    float tz1 = (bmin.z - ray.origin.z) * invD.z, tz2 = (bmax.z - ray.origin.z) * invD.z;
+    tmin = glm::max(tmin, glm::min(tz1, tz2)), tmax = glm::min(tmax, glm::max(tz1, tz2));
+    return tmax >= tmin && (tmin < t || t < 0) && tmax > 0;
+    // ** caused MAJOR slowdown :( **
+    //if (tmax >= tmin && tmin < t && tmax > 0) return tmin; else return 1e30f;
+}
+
+
 __host__ __device__ float BVHIntersectionTest
     (Geom mesh,
-    Triangle* triangles,
-    int* triangles_idx,
-    Ray r,
-    glm::vec3& intersectionPoint,
-    glm::vec3& normal,
-    glm::vec2& uv,
-    bool& outside,
-    BVHNode* bvhNodes)
-{
+        Triangle* triangles,
+        int* triangles_idx,
+        Ray r,
+        glm::vec3& intersectionPoint,
+        glm::vec3& normal,
+        glm::vec2& uv,
+        glm::vec3& tangent,
+        glm::vec3& bitangent,
+        bool& outside,
+        BVHNode* bvhNodes) {
+
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
-    float tmax = 1e38f;
-    float tmin = tmax;
+	float tmax = 1e38f;
+    float tmin = -1.0f;
+    float t = -1.0f;
     glm::vec3 baryNorm;
+    glm::vec2 new_uv;
+    glm::vec3 new_tangent;
+    glm::vec3 new_bitangent;
 
     Ray rt;
     rt.origin = ro;
@@ -209,8 +231,8 @@ __host__ __device__ float BVHIntersectionTest
 
     while (stack_ptr > 0) {
         BVHNode curr_node = bvhNodes[BVHnode_stack[--stack_ptr]];
-        float intersect_box = IntersectAABB(rt, curr_node.aabbMin, curr_node.aabbMax);
-        if (intersect_box < 0) {
+        bool intersect_box = intersectAABB(rt, curr_node.aabbMin, curr_node.aabbMax, tmin);
+        if (!intersect_box) {
             continue;
         }
 
@@ -220,14 +242,35 @@ __host__ __device__ float BVHIntersectionTest
                 glm::vec3 baryPos;
                 bool intersected = glm::intersectRayTriangle(rt.origin, rt.direction,
                     curr_tri.vertices[0], curr_tri.vertices[1], curr_tri.vertices[2], baryPos);
+
                 if (intersected) {
-                    float t = baryPos.z;
-                    if (t > 0 && t < tmin) {
+					t = baryPos.z;
+                    if (t > 0 && (t < tmin || tmin < 0)) {
                         // get closest intersection
                         tmin = t;
+
                         glm::vec3 baryNorm_val = ((1 - baryPos.x - baryPos.y) * curr_tri.normals[0])
                             + (baryPos.x * curr_tri.normals[1]) + (baryPos.y * curr_tri.normals[2]);
                         baryNorm = glm::normalize(baryNorm_val);
+
+                        //textures
+                        if (true) {
+                            new_uv = (1.0f - baryPos.x - baryPos.y) * curr_tri.uvs[0]
+                                + baryPos.x * curr_tri.uvs[1] + baryPos.y * curr_tri.uvs[2];
+                        }
+
+                        //bump map
+                        if (mesh.hasNormal) {
+                            new_tangent = curr_tri.tangent;
+                            new_bitangent = curr_tri.bitangent;
+                        }
+
+                        normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(baryNorm, 0.0f)));
+                        intersectionPoint = multiplyMV(mesh.transform, glm::vec4(rt.origin + rt.direction * t, 1.0f));
+                        outside = glm::dot(baryNorm, rt.direction) < tmax;
+                        uv = new_uv;
+                        tangent = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(new_tangent, 0.0f)));
+                        bitangent = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(new_bitangent, 0.0f)));
                     }
                 }
             }
@@ -238,42 +281,5 @@ __host__ __device__ float BVHIntersectionTest
         }
     }
 
-    if (tmax >= tmin && tmax > 0) {
-        outside = true;
-        intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(rt, tmin), 1.0f));
-        normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(baryNorm, 0.0f)));
-        return glm::length(r.origin - intersectionPoint);
-    }
-
-    outside = false;
-    return -1;
-}
-
-__host__ __device__ float IntersectAABB(const Ray ray, const glm::vec3 bmin, const glm::vec3 bmax)
-{
-    // slab method
-    glm::vec3 ro = ray.origin;
-    glm::vec3 rd = ray.direction;
-    float tmin = -1e38f;
-    float tmax = 1e38f;
-
-    for (int i = 0; i < 3; i++) {
-        float inverse_dir = 1.0f / rd[i];
-        float t0 = (bmin[i] - ro[i]) * inverse_dir;
-        float t1 = (bmax[i] - ro[i]) * inverse_dir;
-        if (inverse_dir < 0.0f) {
-            float temp = t0;
-            t0 = t1;
-            t1 = temp;
-        }
-        tmin = glm::max(tmin, t0);
-        tmax = glm::min(tmax, t1);
-        if (tmax < tmin) {
-            return -1;
-        }
-    }
-    if (tmax < 0.0f) return -1.0f;
     return tmin;
-    //return fmaxf(tmax, fabsf(tmin));
-
 }

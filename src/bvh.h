@@ -7,31 +7,17 @@
 #include <vector>
 #include "scene.h"
 
-struct aabb {
-
-};
-
-
-
+#include "utilities.h"
+#include "sceneStructs.h"
 
 
 class BVH {
 public:
-	BVH(const std::vector<Triangle>& tris) : mesh_triangles(tris) {
-		N = static_cast<int>(mesh_triangles.size());
-		triangles_idx.resize(N);
-		bvhNodes = nullptr;
-		nodes_used = 1;
-	}
-
-	void constructBVH();
-	BVHNode* bvhNodes;
-	int nodes_used;
-	std::vector<int> triangles_idx;
-
-private:
-	void updateBVHBounds(int node_idx);
-	void subdivideBVH(int node_idx);
-	const std::vector<Triangle>& mesh_triangles;
-	int N;
+    BVH(std::vector<Triangle>& triangle);
+    void constructBVH();
+    std::vector<BVHNode> bvhNodes;
+    std::vector<int> triangles_idx;
+    void updateBVHBounds(int node_idx);
+    void subdivideBVH(int node_idx);
+    std::vector<Triangle>& mesh_triangles;
 };

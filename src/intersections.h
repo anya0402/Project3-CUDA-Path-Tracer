@@ -84,15 +84,17 @@ __host__ __device__ float meshIntersectionTest(
 	glm::vec3& bitangent,
     bool& outside);
 
-__host__ __device__ float BVHIntersectionTest
-(Geom mesh,
+__host__ __device__ float BVHIntersectionTest(
+    Geom mesh,
     Triangle* triangles,
     int* triangles_idx,
     Ray r,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
     glm::vec2& uv,
+    glm::vec3& tangent,
+    glm::vec3& bitangent,
     bool& outside,
     BVHNode* bvhNodes);
 
-__host__ __device__ float IntersectAABB(const Ray ray, const glm::vec3 bmin, const glm::vec3 bmax);
+__host__ __device__ bool intersectAABB(const Ray& ray, const glm::vec3 bmin, const glm::vec3 bmax, float t);
