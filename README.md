@@ -36,7 +36,7 @@ For refraction, the light rays bend and distort as they pass through a more tran
 
 |Diffuse (Avg. FPS: 46.2) | Specular (Avg. FPS: 45.8) | Refraction (Avg. FPS: 43.6)|
 |------------------------|------------------------|------------------------|
-|![](img\diffuse_img.png) | ![](img\mirror_img.png) | ![](img\glass_img.png)|
+|<img src="img/diffuse_img.png"> | <img src="img/mirror_img.png"> | <img src="img/glass_img.png">|
 
 
 ### Stochastic Sampled Antialiasing
@@ -44,14 +44,14 @@ Implementing stochastic sampled antialiasing allows for smoother edges instead o
 
 |Without Antialiasing (Avg. FPS: 35.1) | With Antialiasing (Avg. FPS: 35.3) | 
 |------------------------|------------------------|
-|![](img\without_alias.png) | ![](img\with_alias.png) |
+|<img src="img/without_alias.png"> | <img src="img/with_alias.png"> |
 
 ### Physically-based Depth-of-Field
 I used the concepts outlined in [PBRTv4 5.2.3](https://pbr-book.org/4ed/Cameras_and_Film/Projective_Camera_Models#TheThinLensModelandDepthofField) to implement physically-based depth-of-field. It uses a set lens aperture to focus all of the rays toward a set focal distance. This creates an effect of sharp objects at certain distances, and blurry objects at other distances. Since this is implemented on the GPU, it is parallelized, which is once again more efficient than having it run on the CPU. Even though creating the depth-of-field effect requires a little more computational work, it is not enough of a difference to be noticed during the final rendering.
 
 |Without Depth of Field (Avg. FPS: 39.9) | With Depth of Field (Avg. FPS: 40.1) | 
 |------------------------|------------------------|
-|![](img\without_dof.png) | ![](img\with_dof.png) |
+|<img src="img/without_dof.png"> | <img src="img/with_dof.png"> |
 
 ### Arbitrary Mesh Loading and Rendering
 To make the scenes more visually interesting, I implemented the ability to load OBJ files into the pathtracer. OBJ files are a 3D model format that stores information such as vertex positions, surface normals, and more. To load the object, I parsed the OBJ file and stored the mesh information as a list of triangles. Rendering the object involves using the list of triangles to calculate intersections and create the shading for each triangle. Loading and rendering an OBJ file is extremely time and work intensive, as there could be hundreds of thousands of triangles within a single mesh. To fix this, I implemented bounding volume intersection culling in the form of a BVH tree structure. This reduces the number of rays that need to be checked for the entire mesh, speeding up the process of rendering by an incredible amount. More information on BVH is given below in the Performance Improvements section. Loading the OBJ file is done on the CPU, as it doesn't functionally make sense to parallelize the process of parsing through the file to get information about the triangles. The culling is also done on the CPU, but implementing it on the GPU could potentially speed things up even more.
@@ -63,7 +63,7 @@ To make my 3D models more realistic, I implemented the ability to add textures a
 
 |Texture File Only (Avg. FPS: 25.9) | Texture and Bump (Avg. FPS: 24.6) | Procedural Texture (Avg. FPS: 26.2)|
 |------------------------|------------------------|------------------------|
-|![](img\with_texture.png) | ![](img\with_bump.png) | ![](img\procedural.png)|
+|<img src="img/with_texture.png"> | <img src="img/with_bump.png"> | <img src="img/procedural.png">|
 (The diffuse average FPS was 26.3)
 
 ### Environment Mapping
@@ -71,7 +71,7 @@ I implemented environment mapping in a similar fashion to how I implemented text
 
 |Sky / Diffuse (Avg. FPS: 81.2) | Grass / Mirror (Avg. FPS: 79.9) | 
 |------------------------|------------------------|
-|![](img\mario_in_sky.png) | ![](img\mario_in_grass.png) |
+|<img src="img/mario_in_sky.png"> | <img src="img/mario_in_grass.png"> |
 
 
 ## Performance Improvements
@@ -116,11 +116,9 @@ From the graph, we can clearly see how BVH provides a massive speedup in renderi
 ## Bloopers
 Here are some blooper images I accidentally generated during the process of debugging or when things completely broke!
 
-<div style="display: flex; justify-content: center; gap: 10px; flex-wrap: nowrap;">
-    <img src="img/blooper_shader.png" style="width: 33%; height: auto;"/>
-    <img src="img/blooper_refract.png" style="width: 33%; height: auto;"/>
-    <img src="img/blooper_mario.png" style="width: 33%; height: auto;"/>
-</div>
+<img src="img/blooper_shader.png" width="200"/>
+<img src="img/blooper_refract.png" width="200"/>
+<img src="img/blooper_mario.png" width="200"/>
 
 
 ## References
