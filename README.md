@@ -29,7 +29,7 @@ Additional Features
 ## Visual and Mesh Improvements
 
 ### Ideal Diffuse, Perfect Specular, and Refraction Surface Shading
-Surface reflection models are created by calculating how light is transmitted when hitting a surface. We can use the physical properties of certain materials to determine the direction and intensity of the scattered rays. An idea diffuse surface scatters light evenly in all directions, which creates a simple, matte look. A perfect specular surface causes light to bounce back in a single direction, which results in a mirror-like surface. 
+Surface reflection models are created by calculating how light is transmitted when hitting a surface. We can use the physical properties of certain materials to determine the direction and intensity of the scattered rays. An ideal diffuse surface scatters light evenly in all directions, which creates a simple, matte look. A perfect specular surface causes light to bounce back in a single direction, which results in a mirror-like surface. 
 
 For refraction, the light rays bend and distort as they pass through a more transparent material, creating the effect of glass or water. I used the Fresnel formula for these dielectric materials, as outlined in [PBRTv4 9.5](https://pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF). I implemented all of these surface shaders within one large shader kernel, which checks to see if the material has certain properties before deciding how to reflect the light rays. Because of this, there isn't much of a performance difference between the different shaders. The refraction model does involve more computational work, which shaves off a few frames per second. I believe it helps that the shader is run on the GPU as opposed to the CPU, as several rays can be calculated in parallel, speeding up the process. In the future, I would try to separate the large shading kernel into smaller ones to reduce branch divergence.
 
@@ -58,7 +58,7 @@ To make the scenes more visually interesting, I implemented the ability to load 
 <img src="img/mario_obj.png" width="400"/> <img src="img/dragon_obj.png" width="400"/>
 
 ### Texture Mapping, Bump Mapping, and Procedural Texturing
-To make my 3D models more realistic, I implemented the ability to add textures and bump maps. This process involves taking a 2D texture image or bump map image and applying it to the 3D model using UVs calculated from the OBJ file information. I also used the [CUDA Texture Object API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#texture-object-api) to perform some of the calculations needed. A texture image provides a color to sample from, to light the rays accordingly. A bump map makes the 3D model look more realistic and simulates small irregularities in the texture, by editing the surface normals during the shading process. I also made it possible to add procedural textures to a mesh. To test this out, I created a simple procedural texture which simulates a checkerboard pattern, given two colors and a scaling for the size of the squares. The final mapping of these three textures is done in the shading kernel, as each ray and its corresponding calculations are able to be run in parallel on the GPU. If implemented on the CPU without the parallelization, it would most certainly slow down the process. Texturing in general does cause a small slowdown, as each intersesction needs to sample from the different texture images. As mentioned above, in the future I would try to make a separate texturing kernel to avoid branch divergence.
+To make my 3D models more realistic, I implemented the ability to add textures and bump maps. This process involves taking a 2D texture image or bump map image and applying it to the 3D model using UVs calculated from the OBJ file information. I also used the [CUDA Texture Object API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#texture-object-api) to perform some of the calculations needed. A texture image provides a color to sample from, to light the rays accordingly. A bump map makes the 3D model look more realistic and simulates small irregularities in the texture, by editing the surface normals during the shading process. I also made it possible to add procedural textures to a mesh. To test this out, I created a simple procedural texture which simulates a checkerboard pattern, given two colors and a scaling for the size of the squares. The final mapping of these three textures is done in the shading kernel, as each ray and its corresponding calculations are able to be run in parallel on the GPU. If implemented on the CPU without the parallelization, it would most certainly slow down the process. Texturing in general does cause a small slowdown, as each intersection needs to sample from the different texture images. As mentioned above, in the future I would try to make a separate texturing kernel to avoid branch divergence.
 
 |Texture File Only (Avg. FPS: 25.9) | Texture and Bump (Avg. FPS: 24.6) | Procedural Texture (Avg. FPS: 26.2)|
 |------------------------|------------------------|------------------------|
@@ -90,7 +90,7 @@ The above graph shows exactly how stream compaction can be useful. In the closed
 
 <img src="img/bounce_graph.png" width="600"/>
 
-In this graph above, we see the raw results of stream compaction working during a single iteration. Without it, no rays ever leave the buffer, so we have a constant amount of rays throughout the whole process. With stream compaction, we can visibliy see that the number of rays dramatically decreases until we reach the maximum depth and we have no rays left - which is when we move to the next iteration. This shows us that stream compaction is working in our favor to decrease the size of the ray buffer and help with optimization.
+In this graph above, we see the raw results of stream compaction working during a single iteration. Without stream compaction, no rays ever leave the buffer, so we have a constant amount of rays throughout the whole process. With stream compaction, we can visibliy see that the number of rays dramatically decreases until we reach the maximum depth and we have no rays left - which is when we move to the next iteration. This shows us that stream compaction is working in our favor to decrease the size of the ray buffer and help with optimization.
 
 ### Sort Paths by Material
 To further optimize the pathtracer, I tried to sort the rays by material type before I executed the shading kernel. Ideally, this would speed things up since threads for rays that have the same material would be processed together, which would allow for more effective cache hits. However, it turns out that sorting the paths by material drastically slowed down the pathtracer. The size of the ray buffer is quite large most of the time, and the actual sorting is done during each iteration of the pathtracer. Therefore, it seems that the overhead of doing the sorting actually outweighs any performance optimizations that it would theoretically get. 
@@ -111,13 +111,15 @@ The process to create and integrate the BVH was rough, with several hours and da
 | 800 Triangles   | 5.9 FPS       | 22.1 FPS    |
 | 36.5k Triangles | 2.1 FPS        | 19.2 FPS    |
 
-From the graph, we can clearly see how BVH provides a massive speedup in rendering larger meshes with more triangles. Even with a smaller number of triangles, BVH speeds up the process immensely. The BVH tree structure is built on the CPU, but in the future I'd like to try to build it on the GPU to take advantage of parallelism. I'd also want to improve on the contruction of the BVH, like choosing a better split heuristic than the longest axis.
+From the graph, we can clearly see how BVH provides a massive speedup in rendering larger meshes with more triangles. Even with a smaller number of triangles, BVH speeds up the process immensely. The BVH tree structure is built on the CPU, but in the future I'd like to try to build it on the GPU to take advantage of parallelism. I'd also want to improve on the construction of the BVH, like choosing a better split heuristic than the longest axis.
+
+Thank you for checking out my pathtracer!! :)
 
 ## Bloopers
 Here are some blooper images I accidentally generated during the process of debugging or when things completely broke!
 
 <p>
-    <img src="img/blooper_shader.png" width="220"/> <img src="img/blooper_refract.png" width="220"/> <img src="img/blooper_mario.png" width="220"/>
+    <img src="img/blooper_shader.png" width="250"/> <img src="img/blooper_refract.png" width="250"/> <img src="img/blooper_mario.png" width="250"/>
 </p>
 
 
