@@ -394,7 +394,7 @@ int Scene::loadBumpMap(const std::string pathName, const std::string textName) {
 
 int Scene::loadEnvMap(const std::string pathName) {
     int width, height, channels;
-    stbi_set_flip_vertically_on_load(true);
+    //stbi_set_flip_vertically_on_load(true);
 
    /* const std::size_t lastSlashPos{ pathName.find_last_of('/') };
     std::string fullPath = pathName.substr(0, lastSlashPos) + std::string("/") + textName;*/

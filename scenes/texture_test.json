@@ -31,7 +31,7 @@
       "TYPE": "Refract",
       "RGB": [ 0.98, 0.98, 0.98 ],
       "ROUGHNESS": 0.0,
-      "IOR": 1.5
+      "IOR": 1.8
     },
     "procedural": {
       "TYPE": "Procedural",
@@ -53,9 +53,6 @@
     "RADIUS": 1.0,
     "FOCALDIST": 10.0
 
-  },
-  "Environment": {
-    "ENVFILE": "sky_env_hdr.hdr"
   },
   "Objects": [
     {
@@ -102,11 +99,13 @@
     },
     {
       "TYPE": "mesh",
-      "MATERIAL": "procedural",
-      "TRANS": [ -1.0, 2.0, -5.0 ],
-      "ROTAT": [ 0.0, 0.0, 0.0 ],
-      "SCALE": [ 3, 3, 3 ],
-      "OBJFILE": "cube_obj"
+      "MATERIAL": "diffuse_white",
+      "TRANS": [ 0.0, 3.0, -2.0 ],
+      "ROTAT": [ 0.0, 30.0, 0.0 ],
+      "SCALE": [ 2, 2, 2 ],
+      "OBJFILE": "cube_obj",
+      "TEXTURE": "broken_brick_texture.jpg",
+      "BUMP": "brick_normal_texture.jpg"
     }
   ]
 }

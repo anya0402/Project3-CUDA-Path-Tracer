@@ -1,6 +1,3 @@
-    CUDA Path Tracer
-================
-
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
 * Anya Agarwal
@@ -9,7 +6,9 @@
 
 # CUDA Path Tracer
 
-**scene image here**
+<p align="center">
+    <img src="img/final_scene_render.png" width="600"/> 
+</p>
 
 ## Overview
 The goal of this project was to implement a pathtracer written in CUDA and C++, and utilize the GPU to parallelize and speed up the pathtracing processes. Pathtracing is a method to render 3D models and scenes. It essentially traces the path of several rays per pixel as they bounce through the scene and capture information on illumination, shadows, reflections, and more. Using the GPU to pathtrace instead of the CPU achieves an incredible performance boost, as ray calculations are able to run simultaneously. Listed below are the several features I have implemented that extend the functionality of a basic pathtracer:
@@ -64,6 +63,7 @@ To make my 3D models more realistic, I implemented the ability to add textures a
 |Texture File Only (Avg. FPS: 25.9) | Texture and Bump (Avg. FPS: 24.6) | Procedural Texture (Avg. FPS: 26.2)|
 |------------------------|------------------------|------------------------|
 |<img src="img/with_texture.png"> | <img src="img/with_bump.png"> | <img src="img/procedural.png">|
+
 (The diffuse average FPS was 26.3)
 
 ### Environment Mapping
@@ -116,9 +116,9 @@ From the graph, we can clearly see how BVH provides a massive speedup in renderi
 ## Bloopers
 Here are some blooper images I accidentally generated during the process of debugging or when things completely broke!
 
-<img src="img/blooper_shader.png" width="200"/>
-<img src="img/blooper_refract.png" width="200"/>
-<img src="img/blooper_mario.png" width="200"/>
+<p>
+    <img src="img/blooper_shader.png" width="220"/> <img src="img/blooper_refract.png" width="220"/> <img src="img/blooper_mario.png" width="220"/>
+</p>
 
 
 ## References
@@ -127,6 +127,8 @@ Here are some blooper images I accidentally generated during the process of debu
 * OBJ File Loader: [tinyObjLoader](https://github.com/tinyobjloader/tinyobjloader)
 * Texture Mapping: [CUDA Texture Object API](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#texture-object-api)
 * BVH: [How to Build a BVH by Jacco Bikker](https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/)
+* Textures: [Poly Haven](https://polyhaven.com/)
+* 3D Models: [Turbo Squid](https://www.turbosquid.com/)
 
 ### CMakeList.txt Changes
 I added the following files to CMakeList.txt:
