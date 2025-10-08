@@ -16,15 +16,16 @@ The goal of this project was to implement a pathtracer written in CUDA and C++, 
 Core Features
 * Ideal Diffuse and Perfect Specular Surface Shading
 * Stream Compacted Path Termination
-* Rays, Paths, and Intersections Contiguous in Memory
+* Sorted Paths by Material
 * Stochastic Sampled Antialiasing
 
 Additional Features
 * Refraction with Fresnel effects
 * Physically-based Depth-of-Field
 * Texture Mapping, Bump Mapping, and Procedural Texturing
+* Environment Mapping
 * Arbitrary Mesh Loading and Rendering
-* Hierarchal Spatial Data Structures
+* Hierarchal Spatial Data Structures (BVH)
 
 ## Visual and Mesh Improvements
 
@@ -92,7 +93,7 @@ The above graph shows exactly how stream compaction can be useful. In the closed
 
 In this graph above, we see the raw results of stream compaction working during a single iteration. Without stream compaction, no rays ever leave the buffer, so we have a constant amount of rays throughout the whole process. With stream compaction, we can visibliy see that the number of rays dramatically decreases until we reach the maximum depth and we have no rays left - which is when we move to the next iteration. This shows us that stream compaction is working in our favor to decrease the size of the ray buffer and help with optimization.
 
-### Sort Paths by Material
+### Sorted Paths by Material
 To further optimize the pathtracer, I tried to sort the rays by material type before I executed the shading kernel. Ideally, this would speed things up since threads for rays that have the same material would be processed together, which would allow for more effective cache hits. However, it turns out that sorting the paths by material drastically slowed down the pathtracer. The size of the ray buffer is quite large most of the time, and the actual sorting is done during each iteration of the pathtracer. Therefore, it seems that the overhead of doing the sorting actually outweighs any performance optimizations that it would theoretically get. 
 
 |Without Material Sort | With Material Sort | 
